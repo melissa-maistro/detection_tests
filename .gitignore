@@ -1,0 +1,19 @@
+# local Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# Google's repo (clone it with the command in the README)
+synthid-text/
+
+# Gemma output shards (~300 MB, share via Drive instead)
+wm_gemma/
+*.npz
+*.tmp
+
+
+# editor / OS / notebook files
+.vscode/
+.idea/
+.ipynb_checkpoints/
+.DS_Store

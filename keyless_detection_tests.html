@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Keyless SynthID Detection: Counting and Model-Baseline Tests</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5d6676;
+  --line: #dde1e8;
+  --accent: #2f5bd3;
+  --track: #e8ebf1;
+  --best: #1f7a4d;   --best-bg: #e2f3ea;
+  --noise: #8a6a12;  --noise-bg: #f6efd9;
+  --null: #5d6676;   --null-bg: #eceef2;
+  --worse: #a83a2c;  --worse-bg: #f8e4e0;
+  --rule: #6b4fb8;   --rule-bg: #ece6f8;
+  --font-display: "Source Serif 4", Georgia, serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a1f28; --fg: #e4e8ef; --muted: #9aa3b2; --line: #2c3341;
+    --accent: #7ea0ff; --track: #262d3a;
+    --best: #6fd3a0; --best-bg: #173327; --noise: #e3c46a; --noise-bg: #332c14;
+    --null: #a3abba; --null-bg: #252b36; --worse: #f08f80; --worse-bg: #3a1f1b;
+    --rule: #b9a4f2; --rule-bg: #2a2340;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a1f28; --fg: #e4e8ef; --muted: #9aa3b2; --line: #2c3341;
+  --accent: #7ea0ff; --track: #262d3a;
+  --best: #6fd3a0; --best-bg: #173327; --noise: #e3c46a; --noise-bg: #332c14;
+  --null: #a3abba; --null-bg: #252b36; --worse: #f08f80; --worse-bg: #3a1f1b;
+  --rule: #b9a4f2; --rule-bg: #2a2340;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 56px; display: grid; gap: 24px; }
+header { display: grid; gap: 10px; max-width: 72ch; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(26px, 4vw, 36px); line-height: 1.15; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 21px; margin: 8px 0 0; }
+header p, .section p { margin: 0; color: var(--muted); }
+.section { display: grid; gap: 10px; max-width: 80ch; }
+.key { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); align-items: center; }
+.key span { display: inline-flex; align-items: center; gap: 6px; }
+.tick { display: inline-block; width: 2px; height: 12px; }
+.tick.chance { background: var(--muted); }
+.tick.ref { background: var(--accent); }
+.table-box { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 920px; }
+th, td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+thead th { font-family: var(--font-mono); font-size: 11.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--surface); position: sticky; top: 0; }
+tbody tr:last-child td { border-bottom: 0; }
+tr.group td { background: var(--bg); font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-block: 8px; }
+td.num { font-family: var(--font-mono); color: var(--muted); width: 2.5em; font-variant-numeric: tabular-nums; }
+td.name { font-weight: 600; width: 15em; }
+td.desc { color: var(--fg); max-width: 46ch; }
+td.acc { width: 16em; }
+.accv { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 500; }
+.accnote { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.bar { position: relative; height: 6px; background: var(--track); border-radius: 3px; margin-top: 7px; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--fg); opacity: .55;
+  width: min(100%, max(0%, calc((var(--v) - 0.45) / 0.35 * 100%))); }
+.bar::before, .bar::after { content: ""; position: absolute; top: -3px; bottom: -3px; width: 2px; }
+.bar::before { left: calc((0.5 - 0.45) / 0.35 * 100%); background: var(--muted); }
+.bar::after { left: calc((0.596 - 0.45) / 0.35 * 100%); background: var(--accent); }
+tr.is-best .bar i { background: var(--best); opacity: 1; }
+.pill { display: inline-block; font-size: 12px; font-weight: 500; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.p-best { color: var(--best); background: var(--best-bg); }
+.p-noise { color: var(--noise); background: var(--noise-bg); }
+.p-null { color: var(--null); background: var(--null-bg); }
+.p-worse { color: var(--worse); background: var(--worse-bg); }
+.p-rule { color: var(--rule); background: var(--rule-bg); }
+footer { display: grid; gap: 6px; font-size: 13px; color: var(--muted); max-width: 80ch; }
+footer p { margin: 0; }
+code { font-family: var(--font-mono); font-size: 0.92em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Keyless SynthID-Text detection · 2841 pairs · Google human_eval set</p>
+    <h1>Context counting and a model baseline: every test and its accuracy</h1>
+    <p>Paired accuracy is the share of pairs where the watermarked answer scores higher than its unwatermarked twin. Chance is 0.500. AUC is the single-text version: one answer at a time, 0.5 is chance. The reference line is the best single model-baseline score, zd_total at h=4, 0.596.</p>
+    <div class="key">
+      <span><i class="tick chance"></i> chance 0.500</span>
+      <span><i class="tick ref"></i> zd_total h=4, 0.596</span>
+      <span>Bar scale 0.45 to 0.80</span>
+    </div>
+  </header>
+
+  <div class="table-box">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Method</th><th>What it does</th><th>Paired accuracy</th><th>Verdict</th></tr>
+      </thead>
+      <tbody>
+        <tr class="group"><td colspan="5">Context counting, 5-fold CV by question</td></tr>
+        <tr>
+          <td class="num">1</td><td class="name">Context n-gram log ratio</td>
+          <td class="desc">For each "previous h tokens + next token" combination, counts how often it appears in watermarked vs unwatermarked training texts. A test text scores higher if it uses combinations seen more in watermarked text. Tested h=0 to 6. Best at h=4; h=3 is 0.538, h=5 is 0.547.</td>
+          <td class="acc"><span class="accv">0.548</span><span class="accnote">h=4, CI 0.529 to 0.566</span><div class="bar" style="--v:0.548"><i></i></div></td>
+          <td><span class="pill p-noise">Weak signal</span></td>
+        </tr>
+        <tr>
+          <td class="num">2</td><td class="name">Unigram control (h=0)</td>
+          <td class="desc">Same as #1 with no context, only single tokens. SynthID should not change single-token frequencies, so this must stay at chance if nothing else leaks the label.</td>
+          <td class="acc"><span class="accv">0.510</span><span class="accnote">CI 0.491 to 0.528</span><div class="bar" style="--v:0.510"><i></i></div></td>
+          <td><span class="pill p-null">Control passes</span></td>
+        </tr>
+        <tr>
+          <td class="num">3</td><td class="name">Count-aware z score</td>
+          <td class="desc">Replaces the log ratio with (count in wm minus count in unwm) / sqrt(total), so combinations seen many times weigh more. Best at h=5; h=4 is 0.545.</td>
+          <td class="acc"><span class="accv">0.553</span><span class="accnote">h=5, CI 0.535 to 0.571</span><div class="bar" style="--v:0.553"><i></i></div></td>
+          <td><span class="pill p-noise">Same as #1</span></td>
+        </tr>
+        <tr>
+          <td class="num">4</td><td class="name">Equal-weight combination</td>
+          <td class="desc">Standardizes the scores for h=3, 4, 5, 6 and adds them. Tested with both the log ratio and the z score.</td>
+          <td class="acc"><span class="accv">0.549</span><span class="accnote">log ratio; z score 0.547</span><div class="bar" style="--v:0.549"><i></i></div></td>
+          <td><span class="pill p-noise">No gain</span></td>
+        </tr>
+        <tr>
+          <td class="num">5</td><td class="name">Data-scaling curve</td>
+          <td class="desc">Runs #3 at h=4 on nested random subsets of 500, 1000, 2000 and all pairs. Results: 0.553, 0.551, 0.539, 0.545. Intervals at small sizes are wide (0.509 to 0.596 at 500), so the curve cannot show whether more data of this kind helps.</td>
+          <td class="acc"><span class="accv">0.545</span><span class="accnote">all pairs</span><div class="bar" style="--v:0.545"><i></i></div></td>
+          <td><span class="pill p-null">Inconclusive</span></td>
+        </tr>
+
+        <tr class="group"><td colspan="5">Diagnostics at h=4</td></tr>
+        <tr>
+          <td class="num">6</td><td class="name">Shuffled labels</td>
+          <td class="desc">Randomly swaps which answer in each pair is called watermarked, then reruns #3. Must fall to chance if the pipeline has no bug or leakage.</td>
+          <td class="acc"><span class="accv">0.496</span><span class="accnote">CI 0.478 to 0.515</span><div class="bar" style="--v:0.496"><i></i></div></td>
+          <td><span class="pill p-null">Control passes</span></td>
+        </tr>
+        <tr>
+          <td class="num">7</td><td class="name">Commonness, no labels</td>
+          <td class="desc">Scores each text by how common its combinations are across all other texts, both classes pooled, without using labels. Watermarked texts reuse slightly more shared combinations.</td>
+          <td class="acc"><span class="accv">0.531</span><span class="accnote">CI 0.512 to 0.549, AUC 0.510</span><div class="bar" style="--v:0.531"><i></i></div></td>
+          <td><span class="pill p-noise">Small effect</span></td>
+        </tr>
+        <tr>
+          <td class="num">8</td><td class="name">Within-text repetition</td>
+          <td class="desc">Share of repeated combinations inside a single text, no labels used.</td>
+          <td class="acc"><span class="accv">0.502</span><span class="accnote">CI 0.484 to 0.520</span><div class="bar" style="--v:0.502"><i></i></div></td>
+          <td><span class="pill p-null">No signal</span></td>
+        </tr>
+        <tr>
+          <td class="num">9</td><td class="name">Style test</td>
+          <td class="desc">Commonness of each text measured only against unwatermarked texts, which carry no key. If watermarked text were simply more generic, this would be above chance. Stays near 0.5 at every h from 1 to 6.</td>
+          <td class="acc"><span class="accv">0.516</span><span class="accnote">h=4, CI 0.497 to 0.534</span><div class="bar" style="--v:0.516"><i></i></div></td>
+          <td><span class="pill p-null">Not style</span></td>
+        </tr>
+        <tr class="is-best">
+          <td class="num">10</td><td class="name">Key-agreement test</td>
+          <td class="desc">Commonness against other watermarked texts minus commonness against unwatermarked texts, never using the text itself or its pair partner. Rises with h and holds from h=4 on (h=1 0.519, h=4 0.556, h=6 0.557). Shows the signal comes from watermarked texts agreeing on context-specific word choices, which is what a fixed key causes.</td>
+          <td class="acc"><span class="accv">0.556</span><span class="accnote">h=4, CI 0.538 to 0.574</span><div class="bar" style="--v:0.556"><i></i></div></td>
+          <td><span class="pill p-best">Signal is the key</span></td>
+        </tr>
+
+        <tr class="group"><td colspan="5">Context counting, leave-one-pair-out</td></tr>
+        <tr>
+          <td class="num">11</td><td class="name">LOO z score</td>
+          <td class="desc">Each pair is scored with counts from all other pairs, never itself or its partner, so training data goes from 80% to nearly 100%. Mean and total (sum / sqrt n) aggregation per text. Best at h=4.</td>
+          <td class="acc"><span class="accv">0.557</span><span class="accnote">h=4 mean, CI 0.538 to 0.575</span><div class="bar" style="--v:0.557"><i></i></div></td>
+          <td><span class="pill p-noise">Small gain</span></td>
+        </tr>
+        <tr>
+          <td class="num">12</td><td class="name">Stacked logistic regression</td>
+          <td class="desc">18 features (mean, total and coverage for h=1 to 6) combined by a logistic regression trained on pair differences, no intercept, 10-fold CV over pairs. Learned weights are noisy.</td>
+          <td class="acc"><span class="accv">0.565</span><span class="accnote">CI 0.547 to 0.583, AUC 0.550</span><div class="bar" style="--v:0.565"><i></i></div></td>
+          <td><span class="pill p-noise">Within noise of #11</span></td>
+        </tr>
+
+        <tr class="group"><td colspan="5">Model baseline: Gemma-7B-IT no-watermark probabilities, leave-one-pair-out</td></tr>
+        <tr>
+          <td class="num">13</td><td class="name">zw: observed vs expected, wm texts</td>
+          <td class="desc">For each combination, compares how often the token was chosen after that context in other watermarked texts with how often Gemma expected it there (sum of its probabilities). Needs no unwatermarked texts at all. h=3 0.559, h=5 0.551.</td>
+          <td class="acc"><span class="accv">0.574</span><span class="accnote">h=4 total, CI 0.556 to 0.592, AUC 0.545</span><div class="bar" style="--v:0.574"><i></i></div></td>
+          <td><span class="pill p-best">Beats all counting</span></td>
+        </tr>
+        <tr>
+          <td class="num">14</td><td class="name">zu: control</td>
+          <td class="desc">Same comparison against unwatermarked texts, which carry no key. Must stay near chance; shows the model baseline itself does not create signal.</td>
+          <td class="acc"><span class="accv">0.513</span><span class="accnote">h=4 total, CI 0.495 to 0.532</span><div class="bar" style="--v:0.513"><i></i></div></td>
+          <td><span class="pill p-null">Control passes</span></td>
+        </tr>
+        <tr class="is-best">
+          <td class="num">15</td><td class="name">zd = zw minus zu</td>
+          <td class="desc">Subtracts the control to cancel errors in the model baseline that affect both classes equally. Sharp peak at h=4 (h=3 0.565, h=5 0.571), consistent with a 4-token context window (ngram_len 5). Best single score.</td>
+          <td class="acc"><span class="accv">0.596</span><span class="accnote">h=4 total, CI 0.578 to 0.614, AUC 0.572</span><div class="bar" style="--v:0.596"><i></i></div></td>
+          <td><span class="pill p-best">Best single score</span></td>
+        </tr>
+        <tr>
+          <td class="num">16</td><td class="name">Stacked, model features</td>
+          <td class="desc">18 features (zw, zu, zd as mean and total, for h=3, 4, 5) combined by logistic regression, 10-fold CV over pairs.</td>
+          <td class="acc"><span class="accv">0.601</span><span class="accnote">CI 0.583 to 0.619, AUC 0.573</span><div class="bar" style="--v:0.601"><i></i></div></td>
+          <td><span class="pill p-noise">Within noise of #15</span></td>
+        </tr>
+        <tr class="is-best">
+          <td class="num">17</td><td class="name">Skip near-certain positions</td>
+          <td class="desc">Drops positions where Gemma's top probability is above 0.9 (keeps 46% of positions), since the watermark can barely change a token the model is almost sure about. Little change for zd paired, but AUC rises, and zw (no unwatermarked texts needed) rises to match zd. Tested thresholds 1.0, 0.95, 0.9, 0.8; 0.9 reported.</td>
+          <td class="acc"><span class="accv">0.601</span><span class="accnote">zw total, CI 0.583 to 0.619, AUC 0.565<br>zd total 0.598, AUC 0.585</span><div class="bar" style="--v:0.601"><i></i></div></td>
+          <td><span class="pill p-best">Best AUC</span></td>
+        </tr>
+        <tr>
+          <td class="num">18</td><td class="name">Entropy weighting</td>
+          <td class="desc">Instead of dropping positions, weights each one by Gemma's entropy there. Gives about the same as #17; the two fix the same problem and do not add up.</td>
+          <td class="acc"><span class="accv">0.600</span><span class="accnote">zw total, all positions, AUC 0.563<br>zd total 0.597, AUC 0.584</span><div class="bar" style="--v:0.600"><i></i></div></td>
+          <td><span class="pill p-noise">Same as #17</span></td>
+        </tr>
+        <tr>
+          <td class="num">19</td><td class="name">Abstention</td>
+          <td class="desc">Using #17 (zd total), answers only on the pairs with the largest score gap between the two answers. 0.792 on the most confident 10% (284 pairs), 0.732 on 25%, 0.672 on 50%.</td>
+          <td class="acc"><span class="accv">0.792</span><span class="accnote">most confident 10% of pairs</span><div class="bar" style="--v:0.792"><i></i></div></td>
+          <td><span class="pill p-rule">Selective rule</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <section class="section">
+    <h2>What the results show</h2>
+    <p>The signal is real: shuffled labels, the unigram control and the unwatermarked-reference control all stay at chance. It comes from the key, not from style: watermarked texts agree with each other on context-specific word choices, and not with unwatermarked text in general. It peaks at 4 tokens of context, which matches SynthID's default n-gram length of 5.</p>
+    <p>Counting alone stalls around 0.55 to 0.56 because most 4-token contexts appear only once or twice, so the unwatermarked counts used as a baseline are mostly noise (only 9% of a test text's combinations were seen in training at h=4). Replacing that baseline with Gemma's own no-watermark probabilities gives an exact expected value for every context and is the main source of the gain, from 0.557 to 0.596 paired.</p>
+    <p>zw is the variant closest to a real deployment: it uses only watermarked texts plus the model, no unwatermarked twins. With near-certain positions removed it reaches 0.601 paired and 0.565 AUC.</p>
+  </section>
+
+  <footer>
+    <p>Data: Google DeepMind SynthID-Text <code>human_eval.jsonl</code>, Gemma-7B-IT answers to ELI5 questions. 2841 of 3000 pairs used: pairs with fewer than 20 tokens dropped, and each pair truncated to the shorter answer's length so length cannot reveal the label. Tokenized with the Gemma-7B-IT tokenizer.</p>
+    <p>Evaluation: #1 to #6 use 5-fold CV split by question. #7 and #8 use no labels at all, and #9 and #10 compare each text against all other texts, never itself or its pair partner. #11 onward use leave-one-pair-out counts (a pair never sees itself or its partner); stacked models add 10-fold CV over pairs for the weights. Leave-one-pair-out uses more training data than 5-fold, worth about one point in #11 vs #3, so cross-setup comparisons should account for this. Intervals are 95% Wilson intervals on paired accuracy.</p>
+    <p>Model step: Gemma-7B-IT in 4-bit on a T4 GPU, top-40 next-token logits saved for every position. The question text is not in the file, so each answer was scored after a placeholder user turn ("Answer the question.") in Gemma's chat template. Temperature fitted on unwatermarked texts only: 1.25, with the chosen token in the top 40 for 98.5% of positions. Only the first occurrence of each context in a text is counted.</p>
+    <p>Settings such as h=4, the total aggregation and the 0.9 threshold were chosen after seeing results, so headline numbers are mildly optimistic. Differences under about one point are within noise.</p>
+  </footer>
+</div>
+</body>
+</html>
